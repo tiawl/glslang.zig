@@ -1,6 +1,6 @@
 const std = @import ("std");
 const toolbox = @import ("toolbox");
-const pkg = .{ .name = "glslang.zig", .version = "14.0.0", };
+const pkg = .{ .name = "glslang.zig", .version = "1.3.280", };
 
 const Paths = struct
 {
@@ -20,7 +20,7 @@ fn update (builder: *std.Build, path: *const Paths, target: *const std.Build.Res
   };
 
   try toolbox.run (builder, .{ .argv = &[_][] const u8 { "git", "clone", "https://github.com/KhronosGroup/glslang.git", path.include, }, });
-  try toolbox.run (builder, .{ .argv = &[_][] const u8 { "git", "-C", path.include, "checkout", pkg.version, }, });
+  try toolbox.run (builder, .{ .argv = &[_][] const u8 { "git", "-C", path.include, "checkout", "vulkan-sdk-" ++ pkg.version ++ ".0", }, });
 
   try toolbox.run (builder, .{ .argv = &[_][] const u8 { "python3",
     try std.fs.path.join (builder.allocator, &.{ path.include, "build_info.py", }), path.include,
