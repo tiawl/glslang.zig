@@ -126,6 +126,10 @@ pub fn build (builder: *std.Build) !void
   lib.installHeadersDirectory (path.glslang, "glslang");
   std.debug.print ("[glslang headers dir] {s}\n", .{ path.glslang, });
 
+  const spirv_path = try std.fs.path.join (builder.allocator, &.{ path.include, "SPIRV", });
+  lib.installHeadersDirectory (spriv_path, "SPIRV");
+  std.debug.print ("[glslang headers dir] {s}\n", .{ spirv_path, });
+
   lib.linkLibCpp ();
 
   var include_dir = try std.fs.openDirAbsolute (path.include, .{ .iterate = true, });
