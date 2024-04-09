@@ -40,8 +40,6 @@ fn update (builder: *std.Build, path: *const Paths, target: *const std.Build.Res
         try std.fs.deleteTreeAbsolute (try std.fs.path.join (builder.allocator, &.{ path.include, entry.name, }));
   }
 
-  try std.fs.deleteTreeAbsolute (try std.fs.path.join (builder.allocator, &.{ path.glslang, "HLSL", }));
-
   const osdependent_path = try std.fs.path.join (builder.allocator, &.{ path.glslang, "OSDependent", });
   var os: [] const u8 = undefined;
 
@@ -154,7 +152,9 @@ pub fn build (builder: *std.Build) !void
     }
   }
 
-  lib.addCSourceFiles (.{ .files = sources.slice (), });
+  lib.addCSourceFiles (.{
+    .files = sources.slice (), .flags = &.{ "-DENABLE_HLSL", },
+  });
 
   builder.installArtifact (lib);
 }
