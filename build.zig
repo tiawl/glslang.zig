@@ -114,6 +114,9 @@ pub fn build (builder: *std.Build) !void
   for ([_] std.Build.LazyPath {
       .{ .path = ".", },
       .{ .path = "include", },
+      .{ .path = "include/glslang", },
+      .{ .path = "include/SPIRV", },
+      .{ .path = "include/StandAlone", },
     }) |include|
   {
     std.debug.print ("[glslang include] {s}\n", .{ include.getPath (builder), });
