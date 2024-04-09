@@ -70,7 +70,7 @@ fn update (builder: *std.Build, path: *const Paths, target: *const std.Build.Res
   it = standalone_dir.iterate ();
   while (try it.next ()) |entry|
   {
-    if (!std.mem.endsWith (u8, entry.name, ".h") and entry.kind == .file)
+    if (!toolbox.is_header_file (entry.name) and entry.kind == .file)
       try std.fs.deleteFileAbsolute (try std.fs.path.join (builder.allocator, &.{ standalone_path, entry.name, }));
   }
 
@@ -140,7 +140,7 @@ pub fn build (builder: *std.Build) !void
     {
       .file => {
                  const file = try std.fs.path.join (builder.allocator, &.{ path.include, entry.path, });
-                 if (std.mem.endsWith (u8, entry.basename, ".cpp"))
+                 if (toolbox.is_source_file (entry.basename))
                  {
                    try sources.append (file);
                    std.debug.print ("[glslang source] {s}\n", .{ file, });
