@@ -73,6 +73,22 @@ fn update (builder: *std.Build, path: *const Paths, target: *const std.Build.Res
     if (!std.mem.endsWith (u8, entry.name, ".h") and entry.kind == .file)
       try std.fs.deleteFileAbsolute (try std.fs.path.join (builder.allocator, &.{ standalone_path, entry.name, }));
   }
+
+  var walker = try include_dir.walk (builder.allocator);
+  defer walker.deinit ();
+
+  while (try walker.next ()) |entry|
+  {
+    switch (entry.kind)
+    {
+      .file => {
+                 const file = try std.fs.path.join (builder.allocator, &.{ path.include, entry.path, });
+                 if (std.mem.endsWith (u8, entry.basename, ".txt"))
+                   try std.fs.deleteFileAbsolute (file);
+               },
+      else => {},
+    }
+  }
 }
 
 pub fn build (builder: *std.Build) !void
