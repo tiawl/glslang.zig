@@ -68,7 +68,7 @@ fn update (builder: *std.Build, path: *const Paths, target: *const std.Build.Res
   it = standalone_dir.iterate ();
   while (try it.next ()) |entry|
   {
-    if (!toolbox.is_header_file (entry.name) and entry.kind == .file)
+    if (!toolbox.is_c_header_file (entry.name) and entry.kind == .file)
       try std.fs.deleteFileAbsolute (try std.fs.path.join (builder.allocator, &.{ standalone_path, entry.name, }));
   }
 
@@ -121,11 +121,11 @@ pub fn build (builder: *std.Build) !void
     lib.addIncludePath (include);
   }
 
-  lib.installHeadersDirectory (path.glslang, "glslang");
+  lib.installHeadersDirectory (.{ .path = path.glslang, }, "glslang", .{});
   std.debug.print ("[glslang headers dir] {s}\n", .{ path.glslang, });
 
   const spirv_path = try std.fs.path.join (builder.allocator, &.{ path.include, "SPIRV", });
-  lib.installHeadersDirectory (spirv_path, "SPIRV");
+  lib.installHeadersDirectory (.{ .path = spirv_path, }, "SPIRV", .{});
   std.debug.print ("[glslang headers dir] {s}\n", .{ spirv_path, });
 
   lib.linkLibCpp ();
@@ -140,13 +140,10 @@ pub fn build (builder: *std.Build) !void
   {
     switch (entry.kind)
     {
-      .file => {
-                 const file = try std.fs.path.join (builder.allocator, &.{ path.include, entry.path, });
-                 if (toolbox.is_source_file (entry.basename))
-                 {
-                   try sources.append (file);
-                   std.debug.print ("[glslang source] {s}\n", .{ file, });
-                 }
+      .file => if (toolbox.is_cpp_source_file (entry.basename))
+               {
+                 try sources.append (try std.fs.path.join (builder.allocator, &.{ "include", builder.dupe (entry.path), }));
+                 std.debug.print ("[glslang source] {s}\n", .{ try std.fs.path.join (builder.allocator, &.{ path.include, entry.path, }), });
                },
       else => {},
     }
