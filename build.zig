@@ -87,18 +87,6 @@ fn update (builder: *std.Build, path: *const Paths, target: *const std.Build.Res
       else => {},
     }
   }
-
-  const hlsl_path = try std.fs.path.join (builder.allocator, &.{ path.glslang, "HLSL", });
-
-  var hlsl_dir = try std.fs.openDirAbsolute (hlsl_path, .{ .iterate = true, });
-  defer hlsl_dir.close ();
-
-  it = hlsl_dir.iterate ();
-  while (try it.next ()) |entry|
-  {
-    if (!toolbox.is_c_header_file (entry.name) and entry.kind == .file)
-      try std.fs.deleteFileAbsolute (try std.fs.path.join (builder.allocator, &.{ hlsl_path, entry.name, }));
-  }
 }
 
 pub fn build (builder: *std.Build) !void
