@@ -133,11 +133,11 @@ pub fn build (builder: *std.Build) !void
     lib.addIncludePath (include);
   }
 
-  lib.installHeadersDirectory (.{ .path = path.glslang, }, "glslang", .{ .include_extensions = &.{}, });
+  lib.installHeadersDirectory (.{ .path = path.glslang, }, "glslang", .{ .include_extensions = &.{ ".h", }, });
   std.debug.print ("[glslang headers dir] {s}\n", .{ path.glslang, });
 
   const spirv_path = try std.fs.path.join (builder.allocator, &.{ path.include, "SPIRV", });
-  lib.installHeadersDirectory (.{ .path = spirv_path, }, "SPIRV", .{ .include_extensions = &.{}, });
+  lib.installHeadersDirectory (.{ .path = spirv_path, }, "SPIRV", .{ .include_extensions = &.{ ".h", }, });
   std.debug.print ("[glslang headers dir] {s}\n", .{ spirv_path, });
 
   lib.linkLibCpp ();
