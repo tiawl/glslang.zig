@@ -149,7 +149,10 @@ pub fn build (builder: *std.Build) !void
     }
   }
 
-  lib.addCSourceFiles (.{ .files = sources.slice (), });
+  lib.addCSourceFiles (.{
+    .files = sources.slice (),
+    .flags = &.{ "-DENABLE_HLSL", },
+  });
 
   builder.installArtifact (lib);
 }
