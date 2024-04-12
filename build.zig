@@ -151,7 +151,7 @@ pub fn build (builder: *std.Build) !void
 
   lib.addCSourceFiles (.{
     .files = sources.slice (),
-    .flags = &.{ "-DENABLE_HLSL", },
+    .flags = &.{ "-DENABLE_HLSL", "-fno-sanitize=undefined", },
   });
 
   builder.installArtifact (lib);
