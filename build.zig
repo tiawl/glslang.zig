@@ -8,8 +8,7 @@ const Paths = struct
   glslang_in: [] const u8 = undefined,
 };
 
-fn update (builder: *std.Build, path: *const Paths,
-  target: *const std.Build.ResolvedTarget) !void
+fn update (builder: *std.Build, path: *const Paths) !void
 {
   std.fs.deleteTreeAbsolute (path.glslang) catch |err|
   {
@@ -37,36 +36,13 @@ fn update (builder: *std.Build, path: *const Paths,
   defer glslang_dir.close ();
 
   var it = glslang_dir.iterate ();
-  while (try it.next ()) |entry|
+  while (try it.next ()) |*entry|
   {
     if (!std.mem.eql (u8, "SPIRV", entry.name) and
       !std.mem.eql (u8, "StandAlone", entry.name) and
       !std.mem.eql (u8, "glslang", entry.name))
         try std.fs.deleteTreeAbsolute (try std.fs.path.join (
           builder.allocator, &.{ path.glslang, entry.name, }));
-  }
-
-  const osdependent_path = try std.fs.path.join (builder.allocator,
-    &.{ path.glslang_in, "OSDependent", });
-  var os: [] const u8 = undefined;
-
-  switch (target.result.os.tag)
-  {
-    .linux => os = "Unix",
-    .windows => os = "Windows",
-    else => return error.UnsupportedOs,
-  }
-
-  var osdependent_dir =
-    try std.fs.openDirAbsolute (osdependent_path, .{ .iterate = true, });
-  defer osdependent_dir.close ();
-
-  it = osdependent_dir.iterate ();
-  while (try it.next ()) |entry|
-  {
-    if (!std.mem.eql (u8, os, entry.name) and entry.kind == .directory)
-      try std.fs.deleteTreeAbsolute (try std.fs.path.join (builder.allocator,
-        &.{ osdependent_path, entry.name, }));
   }
 
   const standalone_path = try std.fs.path.join (builder.allocator,
@@ -77,7 +53,7 @@ fn update (builder: *std.Build, path: *const Paths,
   defer standalone_dir.close ();
 
   it = standalone_dir.iterate ();
-  while (try it.next ()) |entry|
+  while (try it.next ()) |*entry|
   {
     if (!toolbox.isCHeader (entry.name) and entry.kind == .file)
       try std.fs.deleteFileAbsolute (try std.fs.path.join (builder.allocator,
@@ -87,7 +63,7 @@ fn update (builder: *std.Build, path: *const Paths,
   var walker = try glslang_dir.walk (builder.allocator);
   defer walker.deinit ();
 
-  while (try walker.next ()) |entry|
+  while (try walker.next ()) |*entry|
   {
     switch (entry.kind)
     {
@@ -114,7 +90,7 @@ pub fn build (builder: *std.Build) !void
     try std.fs.path.join (builder.allocator, &.{ path.glslang, "glslang", });
 
   if (builder.option (bool, "update", "Update binding") orelse false)
-    try update (builder, &path, &target);
+    try update (builder, &path);
 
   const lib = builder.addStaticLibrary (.{
     .name = "glslang",
@@ -145,13 +121,46 @@ pub fn build (builder: *std.Build) !void
   var walker = try glslang_dir.walk (builder.allocator);
   defer walker.deinit ();
 
-  while (try walker.next ()) |entry|
+  walk: while (try walker.next ()) |*entry|
   {
     switch (entry.kind)
     {
       .file => {
+        var it = try std.fs.path.componentIterator (entry.path);
+        while (it.next ()) |*component|
+        {
+          if (std.mem.eql (u8, component.name, "OSDependent")) continue :walk;
+        }
         if (toolbox.isCppSource (entry.basename))
           try toolbox.addSource (lib, path.glslang, entry.path, &flags);
+      },
+      else => {},
+    }
+  }
+
+  const os = switch (target.result.os.tag)
+  {
+    .linux => "Unix",
+    .windows => "Windows",
+    else => return error.UnsupportedOs,
+  };
+
+  const os_path = try std.fs.path.join (builder.allocator,
+    &.{ path.glslang_in, "OSDependent", os, });
+
+  var os_dir = try std.fs.openDirAbsolute (os_path,
+    .{ .iterate = true, });
+  defer os_dir.close ();
+
+  var it = os_dir.iterate ();
+
+  while (try it.next ()) |*entry|
+  {
+    switch (entry.kind)
+    {
+      .file => {
+        if (toolbox.isCppSource (entry.name))
+          try toolbox.addSource (lib, os_path, entry.name, &flags);
       },
       else => {},
     }
