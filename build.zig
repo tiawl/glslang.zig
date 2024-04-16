@@ -20,9 +20,8 @@ fn update (builder: *std.Build, path: *const Paths,
     }
   };
 
-  try toolbox.run (builder, .{ .argv = &[_][] const u8 { "git", "clone",
-    "--branch", "vulkan-sdk-" ++ pkg.version ++ ".0", "--depth", "1",
-    "https://github.com/KhronosGroup/glslang.git", path.glslang, }, });
+  try toolbox.clone (builder, "https://github.com/KhronosGroup/glslang.git",
+    "vulkan-sdk-" ++ pkg.version ++ ".0", path.glslang);
 
   try toolbox.run (builder, .{ .argv = &[_][] const u8 { "python3",
     try std.fs.path.join (builder.allocator,
@@ -80,7 +79,7 @@ fn update (builder: *std.Build, path: *const Paths,
   it = standalone_dir.iterate ();
   while (try it.next ()) |entry|
   {
-    if (!toolbox.is_c_header_file (entry.name) and entry.kind == .file)
+    if (!toolbox.isCHeader (entry.name) and entry.kind == .file)
       try std.fs.deleteFileAbsolute (try std.fs.path.join (builder.allocator,
         &.{ standalone_path, entry.name, }));
   }
@@ -124,31 +123,18 @@ pub fn build (builder: *std.Build) !void
     .optimize = optimize,
   });
 
-  var sources = try std.BoundedArray ([] const u8, 256).init (0);
+  const flags = [_][] const u8 { "-DENABLE_HLSL", "-fno-sanitize=undefined", };
 
-  for ([_] std.Build.LazyPath {
-    .{ .path = "glslang", },
-    .{ .path = try std.fs.path.join (builder.allocator,
-      &.{ "glslang", "glslang", }), },
-    .{ .path = try std.fs.path.join (builder.allocator,
-      &.{ "glslang", "SPIRV", }), },
-    .{ .path = try std.fs.path.join (builder.allocator,
-      &.{ "glslang", "StandAlone", }), },
-  }) |include| {
-    std.debug.print ("[glslang include] {s}\n",
-      .{ include.getPath (builder), });
-    lib.addIncludePath (include);
-  }
+  for ([_][] const u8 {
+    "glslang",
+    try std.fs.path.join (builder.allocator, &.{ "glslang", "glslang", }),
+    try std.fs.path.join (builder.allocator, &.{ "glslang", "SPIRV", }),
+    try std.fs.path.join (builder.allocator, &.{ "glslang", "StandAlone", }),
+  }) |include| toolbox.addInclude (lib, include);
 
-  lib.installHeadersDirectory (.{ .path = path.glslang_in, }, "glslang",
-    .{ .include_extensions = &.{ ".h", }, });
-  std.debug.print ("[glslang headers dir] {s}\n", .{ path.glslang_in, });
-
-  const spirv_path = try std.fs.path.join (builder.allocator,
-    &.{ path.glslang, "SPIRV", });
-  lib.installHeadersDirectory (.{ .path = spirv_path, }, "SPIRV",
-    .{ .include_extensions = &.{ ".h", }, });
-  std.debug.print ("[glslang headers dir] {s}\n", .{ spirv_path, });
+  toolbox.addHeader (lib, path.glslang_in, "glslang", &.{ ".h", });
+  toolbox.addHeader (lib, try std.fs.path.join (builder.allocator,
+    &.{ path.glslang, "SPIRV", }), "SPIRV", &.{ ".h", });
 
   lib.linkLibCpp ();
 
@@ -163,22 +149,13 @@ pub fn build (builder: *std.Build) !void
   {
     switch (entry.kind)
     {
-      .file => if (toolbox.is_cpp_source_file (entry.basename))
-      {
-        const source_path = try std.fs.path.join (builder.allocator,
-          &.{ path.glslang, entry.path, });
-        std.debug.print ("[glslang source] {s}\n", .{ source_path, });
-        try sources.append (try std.fs.path.relative (builder.allocator,
-          builder.build_root.path.?, source_path));
+      .file => {
+        if (toolbox.isCppSource (entry.basename))
+          try toolbox.addSource (lib, path.glslang, entry.path, &flags);
       },
       else => {},
     }
   }
-
-  lib.addCSourceFiles (.{
-    .files = sources.slice (),
-    .flags = &.{ "-DENABLE_HLSL", "-fno-sanitize=undefined", },
-  });
 
   builder.installArtifact (lib);
 }
