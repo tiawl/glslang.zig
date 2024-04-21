@@ -1,6 +1,5 @@
 const std = @import ("std");
 const toolbox = @import ("toolbox");
-const pkg = .{ .name = "glslang.zig", .version = "1.3.280", };
 
 const Paths = struct
 {
@@ -8,7 +7,8 @@ const Paths = struct
   glslang_in: [] const u8 = undefined,
 };
 
-fn update (builder: *std.Build, path: *const Paths) !void
+fn update (builder: *std.Build, path: *const Paths,
+  dependencies: *const toolbox.Dependencies) !void
 {
   std.fs.deleteTreeAbsolute (path.glslang) catch |err|
   {
@@ -19,8 +19,7 @@ fn update (builder: *std.Build, path: *const Paths) !void
     }
   };
 
-  try toolbox.clone (builder, "https://github.com/KhronosGroup/glslang.git",
-    "vulkan-sdk-" ++ pkg.version ++ ".0", path.glslang);
+  try dependencies.clone (builder, "glslang", path.glslang);
 
   try toolbox.run (builder, .{ .argv = &[_][] const u8 { "python3",
     try std.fs.path.join (builder.allocator,
@@ -60,22 +59,7 @@ fn update (builder: *std.Build, path: *const Paths) !void
         &.{ standalone_path, entry.name, }));
   }
 
-  var walker = try glslang_dir.walk (builder.allocator);
-  defer walker.deinit ();
-
-  while (try walker.next ()) |*entry|
-  {
-    switch (entry.kind)
-    {
-      .file => {
-        const file = try std.fs.path.join (builder.allocator,
-          &.{ path.glslang, entry.path, });
-        if (std.mem.endsWith (u8, entry.basename, ".txt"))
-          try std.fs.deleteFileAbsolute (file);
-      },
-      else => {},
-    }
-  }
+  try toolbox.clean (builder, &.{ "glslang", }, &.{});
 }
 
 pub fn build (builder: *std.Build) !void
@@ -89,8 +73,26 @@ pub fn build (builder: *std.Build) !void
   path.glslang_in =
     try std.fs.path.join (builder.allocator, &.{ path.glslang, "glslang", });
 
+  const fetch_option = builder.option (bool, "fetch",
+    "Update .versions folder and build.zig.zon then stop execution")
+      orelse false;
+
+  var dependencies = try toolbox.Dependencies.init (builder,
+  .{
+     .toolbox = .{
+       .name = "tiawl/toolbox",
+       .api = toolbox.Repository.API.github,
+     },
+   }, .{
+     .glslang = .{
+       .name = "KhronosGroup/glslang",
+       .api = toolbox.Repository.API.github,
+     },
+   });
+
+  if (fetch_option) try dependencies.fetch (builder, "glslang.zig");
   if (builder.option (bool, "update", "Update binding") orelse false)
-    try update (builder, &path);
+    try update (builder, &path, &dependencies);
 
   const lib = builder.addStaticLibrary (.{
     .name = "glslang",
