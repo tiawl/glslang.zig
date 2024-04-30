@@ -3,14 +3,34 @@ const toolbox = @import ("toolbox");
 
 const Paths = struct
 {
-  glslang: [] const u8 = undefined,
-  glslang_in: [] const u8 = undefined,
+  // prefixed attributes
+  __glslang: [] const u8 = undefined,
+  __glslang_in: [] const u8 = undefined,
+
+  // mandatory getters
+  pub fn getGlslang (self: @This ()) [] const u8 { return self.__glslang; }
+  pub fn getGlslangIn (self: @This ()) [] const u8 { return self.__glslang_in; }
+
+  // mandatory init
+  pub fn init (builder: *std.Build) !@This ()
+  {
+    var self = @This ()
+    {
+      .__glslang = try builder.build_root.join (builder.allocator,
+        &.{ "glslang", }),
+    };
+
+    self.__glslang_in = try std.fs.path.join (builder.allocator,
+      &.{ self.getGlslang (), "glslang", });
+
+    return self;
+  }
 };
 
 fn update (builder: *std.Build, path: *const Paths,
   dependencies: *const toolbox.Dependencies) !void
 {
-  std.fs.deleteTreeAbsolute (path.glslang) catch |err|
+  std.fs.deleteTreeAbsolute (path.getGlslang ()) catch |err|
   {
     switch (err)
     {
@@ -19,19 +39,19 @@ fn update (builder: *std.Build, path: *const Paths,
     }
   };
 
-  try dependencies.clone (builder, "glslang", path.glslang);
+  try dependencies.clone (builder, "glslang", path.getGlslang ());
 
   try toolbox.run (builder, .{ .argv = &[_][] const u8 { "python3",
     try std.fs.path.join (builder.allocator,
-      &.{ path.glslang, "build_info.py", }), path.glslang,
+      &.{ path.getGlslang (), "build_info.py", }), path.getGlslang (),
     "-i", try std.fs.path.join (builder.allocator,
-      &.{ path.glslang, "build_info.h.tmpl", }),
+      &.{ path.getGlslang (), "build_info.h.tmpl", }),
     "-o", try std.fs.path.join (builder.allocator,
-      &.{ path.glslang_in, "build_info.h", }),
+      &.{ path.getGlslangIn (), "build_info.h", }),
   }, });
 
   var glslang_dir =
-    try std.fs.openDirAbsolute (path.glslang, .{ .iterate = true, });
+    try std.fs.openDirAbsolute (path.getGlslang (), .{ .iterate = true, });
   defer glslang_dir.close ();
 
   var it = glslang_dir.iterate ();
@@ -41,11 +61,11 @@ fn update (builder: *std.Build, path: *const Paths,
       !std.mem.eql (u8, "StandAlone", entry.name) and
       !std.mem.eql (u8, "glslang", entry.name))
         try std.fs.deleteTreeAbsolute (try std.fs.path.join (
-          builder.allocator, &.{ path.glslang, entry.name, }));
+          builder.allocator, &.{ path.getGlslang (), entry.name, }));
   }
 
   const standalone_path = try std.fs.path.join (builder.allocator,
-    &.{ path.glslang, "StandAlone", });
+    &.{ path.getGlslang (), "StandAlone", });
 
   var standalone_dir = try std.fs.openDirAbsolute (standalone_path,
     .{ .iterate = true, });
@@ -67,11 +87,7 @@ pub fn build (builder: *std.Build) !void
   const target = builder.standardTargetOptions (.{});
   const optimize = builder.standardOptimizeOption (.{});
 
-  var path: Paths = .{};
-  path.glslang =
-    try builder.build_root.join (builder.allocator, &.{ "glslang", });
-  path.glslang_in =
-    try std.fs.path.join (builder.allocator, &.{ path.glslang, "glslang", });
+  const path = try Paths.init (builder);
 
   const dependencies = try toolbox.Dependencies.init (builder, "glslang.zig",
   .{
@@ -105,13 +121,13 @@ pub fn build (builder: *std.Build) !void
     try std.fs.path.join (builder.allocator, &.{ "glslang", "StandAlone", }),
   }) |include| toolbox.addInclude (lib, include);
 
-  toolbox.addHeader (lib, path.glslang_in, "glslang", &.{ ".h", });
+  toolbox.addHeader (lib, path.getGlslangIn (), "glslang", &.{ ".h", });
   toolbox.addHeader (lib, try std.fs.path.join (builder.allocator,
-    &.{ path.glslang, "SPIRV", }), "SPIRV", &.{ ".h", });
+    &.{ path.getGlslang (), "SPIRV", }), "SPIRV", &.{ ".h", });
 
   lib.linkLibCpp ();
 
-  var glslang_dir = try std.fs.openDirAbsolute (path.glslang,
+  var glslang_dir = try std.fs.openDirAbsolute (path.getGlslang (),
     .{ .iterate = true, });
   defer glslang_dir.close ();
 
@@ -129,7 +145,7 @@ pub fn build (builder: *std.Build) !void
           if (std.mem.eql (u8, component.name, "OSDependent")) continue :walk;
         }
         if (toolbox.isCppSource (entry.basename))
-          try toolbox.addSource (lib, path.glslang, entry.path, &flags);
+          try toolbox.addSource (lib, path.getGlslang (), entry.path, &flags);
       },
       else => {},
     }
@@ -143,7 +159,7 @@ pub fn build (builder: *std.Build) !void
   };
 
   const os_path = try std.fs.path.join (builder.allocator,
-    &.{ path.glslang_in, "OSDependent", os, });
+    &.{ path.getGlslangIn (), "OSDependent", os, });
 
   var os_dir = try std.fs.openDirAbsolute (os_path,
     .{ .iterate = true, });
