@@ -93,12 +93,12 @@ pub fn build (builder: *std.Build) !void
   .{
      .toolbox = .{
        .name = "tiawl/toolbox",
-       .api = toolbox.Repository.API.github,
+       .host = toolbox.Repository.Host.github,
      },
    }, .{
      .glslang = .{
        .name = "KhronosGroup/glslang",
-       .api = toolbox.Repository.API.github,
+       .host = toolbox.Repository.Host.github,
      },
    });
 
