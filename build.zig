@@ -90,6 +90,7 @@ pub fn build (builder: *std.Build) !void
   const path = try Paths.init (builder);
 
   const dependencies = try toolbox.Dependencies.init (builder, "glslang.zig",
+  &.{ "glslang", },
   .{
      .toolbox = .{
        .name = "tiawl/toolbox",
