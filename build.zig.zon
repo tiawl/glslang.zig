@@ -3,9 +3,9 @@
     .version = "1.0.0",
     .minimum_zig_version = "0.12.0",
     .paths = .{
-        "glslang",
-        "build.zig.zon",
         "build.zig",
+        "build.zig.zon",
+        "glslang",
     },
     .dependencies = .{
         .toolbox = .{
