@@ -21,7 +21,7 @@ The current usage of this repository is centered around [tiawl/shaderc.zig][3] c
 
 ## Dependencies
 
-The [Zig][2] part of this package is relying on the latest [Zig][2] release (0.12.0) and will only be updated for the next one (so for the 0.13.0).
+The [Zig][2] part of this package is relying on the latest [Zig][2] release (0.13.0) and will only be updated for the next one (so for the 0.14.0).
 
 Here the repositories' version used by this fork:
 * [KhronosGroup/glslang](https://github.com/tiawl/glslang.zig/blob/trunk/.references/glslang)
