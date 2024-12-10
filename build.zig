@@ -101,7 +101,7 @@ pub fn build (builder: *std.Build) !void
      .glslang = .{
        .name = "KhronosGroup/glslang",
        .host = toolbox.Repository.Host.github,
-       .ref = toolbox.Repository.Reference.tag,
+       .ref = toolbox.Repository.Reference.commit,
      },
    });
 
