@@ -314,6 +314,7 @@ void TParseVersions::initializeExtensionBehavior()
     extensionBehavior[E_GL_NV_shader_atomic_fp16_vector]             = EBhDisable;
     extensionBehavior[E_GL_NV_cooperative_matrix2]                   = EBhDisable;
     extensionBehavior[E_GL_NV_cluster_acceleration_structure]        = EBhDisable;
+    extensionBehavior[E_GL_NV_linear_swept_spheres]                  = EBhDisable;
 
     // ARM
     extensionBehavior[E_GL_ARM_shader_core_builtins]                 = EBhDisable;
@@ -376,6 +377,7 @@ void TParseVersions::initializeExtensionBehavior()
     extensionBehavior[E_GL_EXT_draw_instanced]              = EBhDisable;
     extensionBehavior[E_GL_EXT_texture_array]               = EBhDisable;
     extensionBehavior[E_GL_EXT_texture_offset_non_const]    = EBhDisable;
+    extensionBehavior[E_GL_EXT_nontemporal_keyword]         = EBhDisable;
 
     // OVR extensions
     extensionBehavior[E_GL_OVR_multiview]                = EBhDisable;
