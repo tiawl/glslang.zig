@@ -6,7 +6,7 @@ on:
       - trunk
 
 env:
-  ZIG_VERSION: "0.13.0"
+  ZIG_VERSION: "0.14.0"
 
 jobs:
   build:
@@ -43,16 +43,16 @@ jobs:
         RUNNER_TMP: "${{ runner.temp }}"
       shell: 'bash'
       run: |
-        case "${REPO}" in
-        ( * ) zig build -Dupdate ;;
-        esac
+        zig build -Dupdate
 
     - name: Test fetching ${{ matrix.repo }}.zig
       env:
         REPO: "${{ matrix.repo }}"
         RUNNER_TMP: "${{ runner.temp }}"
+        PR_BODY: "${{ github.event.pull_request.body }}"
       shell: 'bash'
       run: |
-        case "${REPO}" in
-        ( * ) zig build -Dfetch ;;
-        esac
+        opts="$(printf '%s' "${PR_BODY}" | sed -n "s/^\[${REPO} fetch opts\] \(.*\)/\1/p")"
+        set -f
+        zig build -Dfetch ${opts}
+        set +f

@@ -1,7 +1,7 @@
 .{
-    .name = "glslang.zig",
+    .name = .glslang_zig,
     .version = "1.0.0",
-    .minimum_zig_version = "0.13.0",
+    .minimum_zig_version = "0.14.0",
     .paths = .{
         "build.zig",
         "build.zig.zon",
@@ -9,8 +9,9 @@
     },
     .dependencies = .{
         .toolbox = .{
-            .url = "https://github.com/tiawl/toolbox/archive/refs/tags/1.11.2.tar.gz",
-            .hash = "122037046680450473adc3670f08c8695638d05f07c00be18e94ff3f7e21edf9ed9e",
+            .url = "https://github.com/tiawl/toolbox/archive/d310d02d1d3e0b88272b85e2ab11db6a6e1c255c.tar.gz",
+            .hash = "toolbox-1.11.2-kRAu4LpMAACPNVP_CmOCh7Nb1SQ06JFl8UPEGxWaFMra",
         },
     },
+    .fingerprint = 0xe15c80cea022542,
 }
