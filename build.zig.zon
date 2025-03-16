@@ -9,8 +9,8 @@
     },
     .dependencies = .{
         .toolbox = .{
-            .url = "https://github.com/tiawl/toolbox/archive/c8baec69c17c44868bb55bcb2817a91a5da7659d.tar.gz",
-            .hash = "toolbox-1.11.2-kRAu4O9KAACKEtHa6mMiIWOJ-PXIAGfykU7I7axiXJzA",
+            .url = "https://github.com/tiawl/toolbox/archive/d310d02d1d3e0b88272b85e2ab11db6a6e1c255c.tar.gz",
+            .hash = "toolbox-1.11.2-kRAu4LpMAACPNVP_CmOCh7Nb1SQ06JFl8UPEGxWaFMra",
         },
     },
     .fingerprint = 0xe15c80cea022542,
