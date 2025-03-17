@@ -110,13 +110,13 @@ pub fn build(builder: *std.Build) !void {
 
     const path = try Paths.init(builder);
 
-    const dependencies = try toolbox.Dependencies.init(builder, "glslang.zig", &.{
+    const dependencies = try toolbox.Dependencies.init(builder, .glslang_zig, "0xe15c80cea022542", &.{
         "glslang",
     }, .{
         .toolbox = .{
             .name = "tiawl/toolbox",
             .host = toolbox.Repository.Host.github,
-            .ref = toolbox.Repository.Reference.tag,
+            .ref = toolbox.Repository.Reference.commit,
         },
     }, .{
         .glslang = .{
