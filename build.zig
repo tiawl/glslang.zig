@@ -34,11 +34,11 @@ const Paths = struct {
 fn update(builder: *std.Build, path: *const Paths, dependencies: *const toolbox.Dependencies) !void {
     std.fs.deleteTreeAbsolute(path.getGlslang()) catch |err|
         {
-        switch (err) {
-            error.FileNotFound => {},
-            else => return err,
-        }
-    };
+            switch (err) {
+                error.FileNotFound => {},
+                else => return err,
+            }
+        };
 
     try dependencies.clone(builder, "glslang", path.getGlslang());
 
@@ -65,8 +65,8 @@ fn update(builder: *std.Build, path: *const Paths, dependencies: *const toolbox.
 
     var glslang_dir =
         try std.fs.openDirAbsolute(path.getGlslang(), .{
-        .iterate = true,
-    });
+            .iterate = true,
+        });
     defer glslang_dir.close();
 
     var it = glslang_dir.iterate();
