@@ -97,7 +97,7 @@ const FromZon = toolbox.Repositories(.{
 });
 
 const DuringExec = toolbox.Repositories(.{
-    .glslang_zig,
+    .glslang,
 });
 
 pub fn build(builder: *std.Build) !void {
