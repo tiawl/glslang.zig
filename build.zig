@@ -14,13 +14,13 @@ const Paths = struct {
     }
 
     fn init() !@This() {
-        const glslang_path = try toolbox.instance().getBuilder().build_root.join(toolbox.instance().getBuilder().allocator, &.{
+        const glslang_path = try toolbox.instance().buildRootJoin(&.{
             "glslang",
         });
 
         return .{
             .__glslang = glslang_path,
-            .__glslang_in = toolbox.instance().ptrBuilder().pathJoin(&.{
+            .__glslang_in = toolbox.instance().pathJoin(&.{
                 glslang_path, "glslang",
             }),
         };
@@ -35,21 +35,21 @@ fn update(path: *const Paths) !void {
         }
     };
 
-    try toolbox.instance().clone("glslang", path.getGlslang());
+    try toolbox.instance().clone(.glslang, path.getGlslang());
 
     try toolbox.instance().run(.{
         .argv = &[_][]const u8{
             "python3",
-            toolbox.instance().ptrBuilder().pathJoin(&.{
+            toolbox.instance().pathJoin(&.{
                 path.getGlslang(), "build_info.py",
             }),
             path.getGlslang(),
             "-i",
-            toolbox.instance().ptrBuilder().pathJoin(&.{
+            toolbox.instance().pathJoin(&.{
                 path.getGlslang(), "build_info.h.tmpl",
             }),
             "-o",
-            toolbox.instance().ptrBuilder().pathJoin(&.{
+            toolbox.instance().pathJoin(&.{
                 path.getGlslangIn(), "build_info.h",
             }),
         },
@@ -63,13 +63,13 @@ fn update(path: *const Paths) !void {
     var it = glslang_dir.iterate();
     while (try it.next()) |*entry| {
         if (!std.mem.eql(u8, "SPIRV", entry.name) and !std.mem.eql(u8, "StandAlone", entry.name) and !std.mem.eql(u8, "glslang", entry.name)) {
-            try std.fs.deleteTreeAbsolute(toolbox.instance().ptrBuilder().pathJoin(&.{
+            try std.fs.deleteTreeAbsolute(toolbox.instance().pathJoin(&.{
                 path.getGlslang(), entry.name,
             }));
         }
     }
 
-    const standalone_path = toolbox.instance().ptrBuilder().pathJoin(&.{
+    const standalone_path = toolbox.instance().pathJoin(&.{
         path.getGlslang(), "StandAlone",
     });
 
@@ -81,7 +81,7 @@ fn update(path: *const Paths) !void {
     it = standalone_dir.iterate();
     while (try it.next()) |*entry| {
         if (!toolbox.isCHeader(entry.name) and entry.kind == .file) {
-            try std.fs.deleteFileAbsolute(toolbox.instance().ptrBuilder().pathJoin(&.{
+            try std.fs.deleteFileAbsolute(toolbox.instance().pathJoin(&.{
                 standalone_path, entry.name,
             }));
         }
@@ -125,9 +125,9 @@ pub fn build(builder: *std.Build) !void {
 
     if (toolbox.instance().getUpdate()) try update(&path);
 
-    const lib = toolbox.instance().ptrBuilder().addStaticLibrary(.{
+    const lib = builder.addStaticLibrary(.{
         .name = "glslang",
-        .root_source_file = toolbox.instance().ptrBuilder().addWriteFiles().add("empty.c", ""),
+        .root_source_file = builder.addWriteFiles().add("empty.c", ""),
         .target = target,
         .optimize = optimize,
     });
@@ -138,13 +138,13 @@ pub fn build(builder: *std.Build) !void {
 
     for ([_][]const u8{
         "glslang",
-        toolbox.instance().ptrBuilder().pathJoin(&.{
+        builder.pathJoin(&.{
             "glslang", "glslang",
         }),
-        toolbox.instance().ptrBuilder().pathJoin(&.{
+        builder.pathJoin(&.{
             "glslang", "SPIRV",
         }),
-        toolbox.instance().ptrBuilder().pathJoin(&.{
+        builder.pathJoin(&.{
             "glslang", "StandAlone",
         }),
     }) |include| {
@@ -155,7 +155,7 @@ pub fn build(builder: *std.Build) !void {
         ".h",
     });
 
-    toolbox.instance().addHeader(lib, toolbox.instance().ptrBuilder().pathJoin(&.{
+    toolbox.instance().addHeader(lib, builder.pathJoin(&.{
         path.getGlslang(), "SPIRV",
     }), "SPIRV", &.{
         ".h",
@@ -168,7 +168,7 @@ pub fn build(builder: *std.Build) !void {
     });
     defer glslang_dir.close();
 
-    var walker = try glslang_dir.walk(toolbox.instance().getBuilder().allocator);
+    var walker = try glslang_dir.walk(builder.allocator);
     defer walker.deinit();
 
     walk: while (try walker.next()) |*entry| {
@@ -192,7 +192,7 @@ pub fn build(builder: *std.Build) !void {
         else => return error.UnsupportedOs,
     };
 
-    const os_path = toolbox.instance().ptrBuilder().pathJoin(&.{
+    const os_path = builder.pathJoin(&.{
         path.getGlslangIn(), "OSDependent", os,
     });
 
@@ -214,5 +214,5 @@ pub fn build(builder: *std.Build) !void {
         }
     }
 
-    toolbox.instance().ptrBuilder().installArtifact(lib);
+    builder.installArtifact(lib);
 }
