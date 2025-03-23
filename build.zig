@@ -27,7 +27,7 @@ const Paths = struct {
     }
 };
 
-fn update(path: *const Paths, dependencies: *const toolbox.Dependencies) !void {
+fn update(path: *const Paths) !void {
     std.fs.deleteTreeAbsolute(path.getGlslang()) catch |err| {
         switch (err) {
             error.FileNotFound => {},
@@ -35,7 +35,7 @@ fn update(path: *const Paths, dependencies: *const toolbox.Dependencies) !void {
         }
     };
 
-    try dependencies.clone("glslang", path.getGlslang());
+    try toolbox.instance().clone("glslang", path.getGlslang());
 
     try toolbox.instance().run(.{
         .argv = &[_][]const u8{
@@ -92,31 +92,38 @@ fn update(path: *const Paths, dependencies: *const toolbox.Dependencies) !void {
     }, &.{});
 }
 
+const FromZon = toolbox.Repositories(.{
+    .toolbox,
+});
+
+const DuringExec = toolbox.Repositories(.{
+    .glslang_zig,
+});
+
 pub fn build(builder: *std.Build) !void {
     const target = builder.standardTargetOptions(.{});
     const optimize = builder.standardOptimizeOption(.{});
 
-    toolbox.init(builder, optimize);
-    defer toolbox.deinit();
-    const dependencies = try toolbox.Dependencies.init(.glslang_zig, "0xe15c80cea022542", &.{
+    try toolbox.init(FromZon, DuringExec, builder, optimize, .glslang_zig, "0xe15c80cea022542", &.{
         "glslang",
     }, .{
         .toolbox = .{
             .name = "tiawl/toolbox",
-            .host = toolbox.Repository.Host.github,
-            .ref = toolbox.Repository.Reference.tag,
+            .host = .github,
+            .ref = .tag,
         },
     }, .{
         .glslang = .{
             .name = "KhronosGroup/glslang",
-            .host = toolbox.Repository.Host.github,
-            .ref = toolbox.Repository.Reference.commit,
+            .host = .github,
+            .ref = .commit,
         },
     });
+    defer toolbox.deinit();
 
     const path = try Paths.init();
 
-    if (toolbox.instance().getUpdate()) try update(&path, &dependencies);
+    if (toolbox.instance().getUpdate()) try update(&path);
 
     const lib = toolbox.instance().ptrBuilder().addStaticLibrary(.{
         .name = "glslang",
