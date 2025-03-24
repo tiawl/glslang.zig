@@ -1,5 +1,6 @@
 const std = @import("std");
-const toolbox = @import("toolbox");
+const toolbox_pkg = @import("toolbox");
+const Toolbox = toolbox_pkg.Toolbox;
 
 const Paths = struct {
     __glslang: []const u8,
@@ -13,21 +14,21 @@ const Paths = struct {
         return self.__glslang_in;
     }
 
-    fn init() !@This() {
-        const glslang_path = try toolbox.instance().buildRootJoin(&.{
+    fn init(toolbox: *Toolbox) !@This() {
+        const glslang_path = try toolbox.buildRootJoin(&.{
             "glslang",
         });
 
         return .{
             .__glslang = glslang_path,
-            .__glslang_in = toolbox.instance().pathJoin(&.{
+            .__glslang_in = toolbox.pathJoin(&.{
                 glslang_path, "glslang",
             }),
         };
     }
 };
 
-fn update(path: *const Paths) !void {
+fn update(toolbox: *Toolbox, path: *const Paths) !void {
     std.fs.deleteTreeAbsolute(path.getGlslang()) catch |err| {
         switch (err) {
             error.FileNotFound => {},
@@ -35,21 +36,21 @@ fn update(path: *const Paths) !void {
         }
     };
 
-    try toolbox.instance().clone(.glslang, path.getGlslang());
+    try toolbox.clone(.glslang, path.getGlslang());
 
-    try toolbox.instance().run(.{
+    try toolbox.run(.{
         .argv = &[_][]const u8{
             "python3",
-            toolbox.instance().pathJoin(&.{
+            toolbox.pathJoin(&.{
                 path.getGlslang(), "build_info.py",
             }),
             path.getGlslang(),
             "-i",
-            toolbox.instance().pathJoin(&.{
+            toolbox.pathJoin(&.{
                 path.getGlslang(), "build_info.h.tmpl",
             }),
             "-o",
-            toolbox.instance().pathJoin(&.{
+            toolbox.pathJoin(&.{
                 path.getGlslangIn(), "build_info.h",
             }),
         },
@@ -63,13 +64,13 @@ fn update(path: *const Paths) !void {
     var it = glslang_dir.iterate();
     while (try it.next()) |*entry| {
         if (!std.mem.eql(u8, "SPIRV", entry.name) and !std.mem.eql(u8, "StandAlone", entry.name) and !std.mem.eql(u8, "glslang", entry.name)) {
-            try std.fs.deleteTreeAbsolute(toolbox.instance().pathJoin(&.{
+            try std.fs.deleteTreeAbsolute(toolbox.pathJoin(&.{
                 path.getGlslang(), entry.name,
             }));
         }
     }
 
-    const standalone_path = toolbox.instance().pathJoin(&.{
+    const standalone_path = toolbox.pathJoin(&.{
         path.getGlslang(), "StandAlone",
     });
 
@@ -80,23 +81,23 @@ fn update(path: *const Paths) !void {
 
     it = standalone_dir.iterate();
     while (try it.next()) |*entry| {
-        if (!toolbox.isCHeader(entry.name) and entry.kind == .file) {
-            try std.fs.deleteFileAbsolute(toolbox.instance().pathJoin(&.{
+        if (!toolbox_pkg.isCHeader(entry.name) and entry.kind == .file) {
+            try std.fs.deleteFileAbsolute(toolbox.pathJoin(&.{
                 standalone_path, entry.name,
             }));
         }
     }
 
-    try toolbox.instance().clean(&.{
+    try toolbox.clean(&.{
         "glslang",
     }, &.{});
 }
 
-const FromZon = toolbox.Repositories(.{
+const FromZon = toolbox_pkg.Repositories(.{
     .toolbox,
 });
 
-const DuringExec = toolbox.Repositories(.{
+const DuringExec = toolbox_pkg.Repositories(.{
     .glslang,
 });
 
@@ -104,7 +105,7 @@ pub fn build(builder: *std.Build) !void {
     const target = builder.standardTargetOptions(.{});
     const optimize = builder.standardOptimizeOption(.{});
 
-    try toolbox.init(FromZon, DuringExec, builder, optimize, .glslang_zig, "0xe15c80cea022542", &.{
+    var toolbox = try Toolbox.init(FromZon, DuringExec, builder, optimize, .glslang_zig, "0xe15c80cea022542", &.{
         "glslang",
     }, .{
         .toolbox = .{
@@ -121,9 +122,9 @@ pub fn build(builder: *std.Build) !void {
     });
     defer toolbox.deinit();
 
-    const path = try Paths.init();
+    const path = try Paths.init(&toolbox);
 
-    if (toolbox.instance().getUpdate()) try update(&path);
+    if (toolbox.getUpdate()) try update(&toolbox, &path);
 
     const lib = builder.addStaticLibrary(.{
         .name = "glslang",
@@ -148,14 +149,14 @@ pub fn build(builder: *std.Build) !void {
             "glslang", "StandAlone",
         }),
     }) |include| {
-        toolbox.instance().addInclude(lib, include);
+        toolbox.addInclude(lib, include);
     }
 
-    toolbox.instance().addHeader(lib, path.getGlslangIn(), "glslang", &.{
+    toolbox.addHeader(lib, path.getGlslangIn(), "glslang", &.{
         ".h",
     });
 
-    toolbox.instance().addHeader(lib, builder.pathJoin(&.{
+    toolbox.addHeader(lib, builder.pathJoin(&.{
         path.getGlslang(), "SPIRV",
     }), "SPIRV", &.{
         ".h",
@@ -178,8 +179,8 @@ pub fn build(builder: *std.Build) !void {
                 while (it.next()) |*component| {
                     if (std.mem.eql(u8, component.name, "OSDependent")) continue :walk;
                 }
-                if (toolbox.isCppSource(entry.basename)) {
-                    try toolbox.instance().addSource(lib, path.getGlslang(), entry.path, &flags);
+                if (toolbox_pkg.isCppSource(entry.basename)) {
+                    try toolbox.addSource(lib, path.getGlslang(), entry.path, &flags);
                 }
             },
             else => {},
@@ -206,8 +207,8 @@ pub fn build(builder: *std.Build) !void {
     while (try it.next()) |*entry| {
         switch (entry.kind) {
             .file => {
-                if (toolbox.isCppSource(entry.name)) {
-                    try toolbox.instance().addSource(lib, os_path, entry.name, &flags);
+                if (toolbox_pkg.isCppSource(entry.name)) {
+                    try toolbox.addSource(lib, os_path, entry.name, &flags);
                 }
             },
             else => {},
