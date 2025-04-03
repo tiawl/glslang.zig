@@ -64,6 +64,7 @@ namespace spv {
 #include <sstream>
 #include <stack>
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 
 namespace spv {
@@ -997,6 +998,10 @@ public:
     std::unordered_map<unsigned int, std::vector<Instruction*>> groupedDebugTypes;
     // list of OpConstantNull instructions
     std::vector<Instruction*> nullConstants;
+
+    // Track which types have explicit layouts, to avoid reusing in storage classes without layout.
+    // Currently only tracks array types.
+    std::unordered_set<unsigned int> explicitlyLaidOut;
 
     // stack of switches
     std::stack<Block*> switchMerges;
