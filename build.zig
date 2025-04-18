@@ -44,7 +44,8 @@ fn update(toolbox: *Toolbox, path: *const Paths) !void {
             toolbox.pathJoin(&.{
                 path.getGlslang(), "build_info.py",
             }),
-            path.getGlslang(), "-i",
+            path.getGlslang(),
+            "-i",
             toolbox.pathJoin(&.{
                 path.getGlslang(), "build_info.h.tmpl",
             }),
@@ -107,9 +108,7 @@ fn update(toolbox: *Toolbox, path: *const Paths) !void {
 
     try toolbox.clean(&.{
         "glslang",
-    }, &.{
-        "glsl",
-    });
+    }, &.{});
 }
 
 const FromZon = toolbox_pkg.Repositories(.{
