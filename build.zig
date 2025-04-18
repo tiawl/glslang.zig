@@ -44,14 +44,30 @@ fn update(toolbox: *Toolbox, path: *const Paths) !void {
             toolbox.pathJoin(&.{
                 path.getGlslang(), "build_info.py",
             }),
-            path.getGlslang(),
-            "-i",
+            path.getGlslang(), "-i",
             toolbox.pathJoin(&.{
                 path.getGlslang(), "build_info.h.tmpl",
             }),
             "-o",
             toolbox.pathJoin(&.{
                 path.getGlslangIn(), "build_info.h",
+            }),
+        },
+    });
+
+    try toolbox.run(.{
+        .argv = &[_][]const u8{
+            "python3",
+            toolbox.pathJoin(&.{
+                path.getGlslang(), "gen_extension_headers.py",
+            }),
+            "-i",
+            toolbox.pathJoin(&.{
+                path.getGlslangIn(), "ExtensionHeaders",
+            }),
+            "-o",
+            toolbox.pathJoin(&.{
+                path.getGlslangIn(), "glsl_intrinsic_header.h",
             }),
         },
     });
@@ -81,6 +97,7 @@ fn update(toolbox: *Toolbox, path: *const Paths) !void {
 
     it = standalone_dir.iterate();
     while (try it.next()) |*entry| {
+        if (std.mem.startsWith(u8, entry.name, "StandAlone")) continue;
         if (!toolbox_pkg.isCHeader(entry.name) and entry.kind == .file) {
             try std.fs.deleteFileAbsolute(toolbox.pathJoin(&.{
                 standalone_path, entry.name,
@@ -90,7 +107,9 @@ fn update(toolbox: *Toolbox, path: *const Paths) !void {
 
     try toolbox.clean(&.{
         "glslang",
-    }, &.{});
+    }, &.{
+        "glsl",
+    });
 }
 
 const FromZon = toolbox_pkg.Repositories(.{
@@ -179,6 +198,7 @@ pub fn build(builder: *std.Build) !void {
                 while (it.next()) |*component| {
                     if (std.mem.eql(u8, component.name, "OSDependent")) continue :walk;
                 }
+                if (std.mem.startsWith(u8, entry.basename, "StandAlone")) continue :walk;
                 if (toolbox_pkg.isCppSource(entry.basename)) {
                     try toolbox.addSource(lib, path.getGlslang(), entry.path, &flags);
                 }
@@ -214,6 +234,40 @@ pub fn build(builder: *std.Build) !void {
             else => {},
         }
     }
+
+    const exe = builder.addExecutable(.{
+        .name = "glslangValidator",
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.linkLibCpp();
+    exe.linkLibrary(lib);
+    exe.addCSourceFiles(.{
+        .root = .{
+            .cwd_relative = toolbox.pathJoin(&.{
+                path.getGlslang(), "StandAlone",
+            }),
+        },
+        .files = &.{
+            "StandAlone.cpp",
+        },
+        .flags = &[_][]const u8{
+            "-std=c++17", "-fno-exceptions", "-fno-exceptions",
+        },
+    });
+    exe.addIncludePath(.{
+        .cwd_relative = path.getGlslang(),
+    });
+    exe.addIncludePath(.{
+        .cwd_relative = path.getGlslangIn(),
+    });
+    exe.root_module.addCMacro("ENABLE_OPT", if (builder.option(bool, "enable-opt", "Enables spirv-opt capability if present") orelse true) "1" else "0");
+    builder.installArtifact(exe);
+    const glslang_run_cmd = builder.addRunArtifact(exe);
+    glslang_run_cmd.step.dependOn(builder.getInstallStep());
+    if (builder.args) |args| glslang_run_cmd.addArgs(args);
+    const glslang_run_step = builder.step("glslangValidator", "Run glslang");
+    glslang_run_step.dependOn(&glslang_run_cmd.step);
 
     builder.installArtifact(lib);
 }
