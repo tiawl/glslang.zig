@@ -234,6 +234,7 @@ pub fn build(builder: *std.Build) !void {
         }
     }
 
+    // the exe part is coming from https://github.com/Games-by-Mason/glslang-zig
     const exe = builder.addExecutable(.{
         .name = "glslangValidator",
         .target = target,
