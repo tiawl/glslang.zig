@@ -912,7 +912,8 @@ TIntermTyped* TParseContext::handleBinaryMath(const TSourceLoc& loc, const char*
     if (((left->getType().contains16BitFloat() || right->getType().contains16BitFloat()) && !float16Arithmetic()) ||
         ((left->getType().contains16BitInt() || right->getType().contains16BitInt()) && !int16Arithmetic()) ||
         ((left->getType().contains8BitInt() || right->getType().contains8BitInt()) && !int8Arithmetic()) ||
-        (left->getType().containsBFloat16() || right->getType().containsBFloat16())) {
+        (left->getType().containsBFloat16() || right->getType().containsBFloat16()) ||
+        (left->getType().contains8BitFloat() || right->getType().contains8BitFloat())) {
         allowed = false;
     }
 
@@ -940,7 +941,8 @@ TIntermTyped* TParseContext::handleUnaryMath(const TSourceLoc& loc, const char* 
     if ((childNode->getType().contains16BitFloat() && !float16Arithmetic()) ||
         (childNode->getType().contains16BitInt() && !int16Arithmetic()) ||
         (childNode->getType().contains8BitInt() && !int8Arithmetic()) ||
-        (childNode->getType().containsBFloat16())) {
+        (childNode->getType().containsBFloat16()) ||
+        (childNode->getType().contains8BitFloat())) {
         allowed = false;
     }
 
@@ -2103,7 +2105,10 @@ void TParseContext::addInputArgumentConversions(const TFunction& function, TInte
         TIntermTyped* arg = function.getParamCount() == 1 ? arguments->getAsTyped() : (aggregate ? aggregate->getSequence()[i]->getAsTyped() : arguments->getAsTyped());
         if (*function[i].type != arg->getType()) {
             if (function[i].type->getQualifier().isParamInput() &&
-               !function[i].type->isCoopMat() && !function[i].type->isTensorARM()) {
+               !function[i].type->isCoopMat() && !function[i].type->isTensorARM() &&
+               // tensor layout/view type declarations don't do conversions, so we can't convert these parameters either
+               (function.getName() != "createTensorLayoutNV") &&
+               (function.getName() != "createTensorViewNV")) {
                 // In-qualified arguments just need an extra node added above the argument to
                 // convert to the correct type.
                 arg = intermediate.addConversion(EOpFunctionCall, *function[i].type, arg);
@@ -2230,6 +2235,9 @@ void TParseContext::memorySemanticsCheck(const TSourceLoc& loc, const TFunction&
     const int gl_StorageSemanticsImage    = 0x800;
     const int gl_StorageSemanticsOutput   = 0x1000;
 
+    const int nonRelaxedMemoryOrder = gl_SemanticsAcquire |
+                                      gl_SemanticsRelease |
+                                      gl_SemanticsAcquireRelease;
 
     unsigned int semantics = 0, storageClassSemantics = 0;
     unsigned int semantics2 = 0, storageClassSemantics2 = 0;
@@ -2296,22 +2304,6 @@ void TParseContext::memorySemanticsCheck(const TSourceLoc& loc, const TFunction&
         break;
     }
 
-    if ((semantics & gl_SemanticsAcquire) &&
-        (callNode.getOp() == EOpAtomicStore || callNode.getOp() == EOpImageAtomicStore)) {
-        error(loc, "gl_SemanticsAcquire must not be used with (image) atomic store",
-              fnCandidate.getName().c_str(), "");
-    }
-    if ((semantics & gl_SemanticsRelease) &&
-        (callNode.getOp() == EOpAtomicLoad || callNode.getOp() == EOpImageAtomicLoad)) {
-        error(loc, "gl_SemanticsRelease must not be used with (image) atomic load",
-              fnCandidate.getName().c_str(), "");
-    }
-    if ((semantics & gl_SemanticsAcquireRelease) &&
-        (callNode.getOp() == EOpAtomicStore || callNode.getOp() == EOpImageAtomicStore ||
-         callNode.getOp() == EOpAtomicLoad  || callNode.getOp() == EOpImageAtomicLoad)) {
-        error(loc, "gl_SemanticsAcquireRelease must not be used with (image) atomic load/store",
-              fnCandidate.getName().c_str(), "");
-    }
     if (((semantics | semantics2) & ~(gl_SemanticsAcquire |
                                       gl_SemanticsRelease |
                                       gl_SemanticsAcquireRelease |
@@ -2320,6 +2312,7 @@ void TParseContext::memorySemanticsCheck(const TSourceLoc& loc, const TFunction&
                                       gl_SemanticsVolatile))) {
         error(loc, "Invalid semantics value", fnCandidate.getName().c_str(), "");
     }
+
     if (((storageClassSemantics | storageClassSemantics2) & ~(gl_StorageSemanticsBuffer |
                                                               gl_StorageSemanticsShared |
                                                               gl_StorageSemanticsImage |
@@ -2327,57 +2320,101 @@ void TParseContext::memorySemanticsCheck(const TSourceLoc& loc, const TFunction&
         error(loc, "Invalid storage class semantics value", fnCandidate.getName().c_str(), "");
     }
 
-    if (callNode.getOp() == EOpMemoryBarrier) {
-        if (!IsPow2(semantics & (gl_SemanticsAcquire | gl_SemanticsRelease | gl_SemanticsAcquireRelease))) {
-            error(loc, "Semantics must include exactly one of gl_SemanticsRelease, gl_SemanticsAcquire, or "
-                       "gl_SemanticsAcquireRelease", fnCandidate.getName().c_str(), "");
-        }
-    } else {
-        if (semantics & (gl_SemanticsAcquire | gl_SemanticsRelease | gl_SemanticsAcquireRelease)) {
-            if (!IsPow2(semantics & (gl_SemanticsAcquire | gl_SemanticsRelease | gl_SemanticsAcquireRelease))) {
-                error(loc, "Semantics must not include multiple of gl_SemanticsRelease, gl_SemanticsAcquire, or "
-                           "gl_SemanticsAcquireRelease", fnCandidate.getName().c_str(), "");
-            }
-        }
-        if (semantics2 & (gl_SemanticsAcquire | gl_SemanticsRelease | gl_SemanticsAcquireRelease)) {
-            if (!IsPow2(semantics2 & (gl_SemanticsAcquire | gl_SemanticsRelease | gl_SemanticsAcquireRelease))) {
-                error(loc, "semUnequal must not include multiple of gl_SemanticsRelease, gl_SemanticsAcquire, or "
-                           "gl_SemanticsAcquireRelease", fnCandidate.getName().c_str(), "");
-            }
-        }
-    }
-    if (callNode.getOp() == EOpMemoryBarrier) {
-        if (storageClassSemantics == 0) {
-            error(loc, "Storage class semantics must not be zero", fnCandidate.getName().c_str(), "");
-        }
-    }
-    if (callNode.getOp() == EOpBarrier && semantics != 0 && storageClassSemantics == 0) {
-        error(loc, "Storage class semantics must not be zero", fnCandidate.getName().c_str(), "");
-    }
-    if ((callNode.getOp() == EOpAtomicCompSwap || callNode.getOp() == EOpImageAtomicCompSwap) &&
-        (semantics2 & (gl_SemanticsRelease | gl_SemanticsAcquireRelease))) {
-        error(loc, "semUnequal must not be gl_SemanticsRelease or gl_SemanticsAcquireRelease",
+    if (((semantics & nonRelaxedMemoryOrder) && !IsPow2(semantics & nonRelaxedMemoryOrder)) ||
+        ((semantics2 & nonRelaxedMemoryOrder) && !IsPow2(semantics2 & nonRelaxedMemoryOrder))) {
+        error(loc,
+              "Semantics must not include multiple of gl_SemanticsRelease, gl_SemanticsAcquire, or "
+              "gl_SemanticsAcquireRelease",
               fnCandidate.getName().c_str(), "");
     }
-    if ((semantics & gl_SemanticsMakeAvailable) &&
-        !(semantics & (gl_SemanticsRelease | gl_SemanticsAcquireRelease))) {
+
+    if (((semantics & nonRelaxedMemoryOrder) && !storageClassSemantics) ||
+        ((semantics2 & nonRelaxedMemoryOrder) && !storageClassSemantics2)) {
+        error(loc,
+              "Storage class semantics must not be zero when used with gl_SemanticsRelease, "
+              "gl_SemanticsAcquire, or gl_SemanticsAcquireRelease",
+              fnCandidate.getName().c_str(), "");
+    }
+
+    if ((storageClassSemantics && !(semantics & nonRelaxedMemoryOrder)) ||
+        (storageClassSemantics2 && !(semantics2 & nonRelaxedMemoryOrder))) {
+        error(loc,
+              "Semantics must be gl_SemanticsRelease, gl_SemanticsAcquire, or gl_SemanticsAcquireRelease when used "
+              "with non-zero storage class semantics",
+              fnCandidate.getName().c_str(), "");
+    }
+
+    if (((semantics & gl_SemanticsMakeAvailable) &&
+         !(semantics & (gl_SemanticsRelease | gl_SemanticsAcquireRelease))) ||
+        ((semantics2 & gl_SemanticsMakeAvailable) &&
+         !(semantics2 & (gl_SemanticsRelease | gl_SemanticsAcquireRelease)))) {
         error(loc, "gl_SemanticsMakeAvailable requires gl_SemanticsRelease or gl_SemanticsAcquireRelease",
               fnCandidate.getName().c_str(), "");
     }
-    if ((semantics & gl_SemanticsMakeVisible) &&
-        !(semantics & (gl_SemanticsAcquire | gl_SemanticsAcquireRelease))) {
+
+    if (((semantics & gl_SemanticsMakeVisible) && !(semantics & (gl_SemanticsAcquire | gl_SemanticsAcquireRelease))) ||
+        ((semantics2 & gl_SemanticsMakeVisible) &&
+         !(semantics2 & (gl_SemanticsAcquire | gl_SemanticsAcquireRelease)))) {
         error(loc, "gl_SemanticsMakeVisible requires gl_SemanticsAcquire or gl_SemanticsAcquireRelease",
               fnCandidate.getName().c_str(), "");
     }
-    if ((semantics & gl_SemanticsVolatile) &&
-        (callNode.getOp() == EOpMemoryBarrier || callNode.getOp() == EOpBarrier)) {
+
+    if ((callNode.getOp() == EOpAtomicStore || callNode.getOp() == EOpImageAtomicStore) &&
+        (semantics & gl_SemanticsAcquire)) {
+        error(loc, "gl_SemanticsAcquire must not be used with (image) atomic store", fnCandidate.getName().c_str(), "");
+    }
+
+    if ((callNode.getOp() == EOpAtomicLoad || callNode.getOp() == EOpImageAtomicLoad) &&
+        (semantics & gl_SemanticsRelease)) {
+        error(loc, "gl_SemanticsRelease must not be used with (image) atomic load", fnCandidate.getName().c_str(), "");
+    }
+
+    if ((callNode.getOp() == EOpAtomicStore || callNode.getOp() == EOpImageAtomicStore ||
+         callNode.getOp() == EOpAtomicLoad || callNode.getOp() == EOpImageAtomicLoad) &&
+        (semantics & gl_SemanticsAcquireRelease)) {
+        error(loc, "gl_SemanticsAcquireRelease must not be used with (image) atomic load/store",
+              fnCandidate.getName().c_str(), "");
+    }
+
+    if (callNode.getOp() == EOpMemoryBarrier &&
+        !(semantics & (gl_SemanticsAcquire | gl_SemanticsRelease | gl_SemanticsAcquireRelease))) {
+        error(loc,
+              "Semantics must include exactly one of gl_SemanticsRelease, gl_SemanticsAcquire, or "
+              "gl_SemanticsAcquireRelease when used with memoryBarrier",
+              fnCandidate.getName().c_str(), "");
+    }
+
+    if ((callNode.getOp() == EOpMemoryBarrier || callNode.getOp() == EOpBarrier) &&
+        (semantics & gl_SemanticsVolatile)) {
         error(loc, "gl_SemanticsVolatile must not be used with memoryBarrier or controlBarrier",
               fnCandidate.getName().c_str(), "");
     }
-    if ((callNode.getOp() == EOpAtomicCompSwap || callNode.getOp() == EOpImageAtomicCompSwap) &&
-        ((semantics ^ semantics2) & gl_SemanticsVolatile)) {
-        error(loc, "semEqual and semUnequal must either both include gl_SemanticsVolatile or neither",
-              fnCandidate.getName().c_str(), "");
+
+    if (callNode.getOp() == EOpAtomicCompSwap || callNode.getOp() == EOpImageAtomicCompSwap) {
+        if (semantics2 & (gl_SemanticsRelease | gl_SemanticsAcquireRelease)) {
+            error(loc, "semUnequal must not be gl_SemanticsRelease or gl_SemanticsAcquireRelease",
+                  fnCandidate.getName().c_str(), "");
+        }
+        if ((semantics2 & gl_SemanticsAcquire) && !(semantics & (gl_SemanticsAcquire | gl_SemanticsAcquireRelease))) {
+            error(loc,
+                  "semUnequal must not be gl_SemanticsAcquire unless semEqual is gl_SemanticsAcquire "
+                  "or gl_SemanticsAcquireRelease",
+                  fnCandidate.getName().c_str(), "");
+        }
+        if ((semantics2 & gl_SemanticsMakeVisible) && !(semantics & gl_SemanticsMakeVisible)) {
+            error(loc,
+                  "semUnequal must not include gl_SemanticsMakeVisible unless semEqual also includes "
+                  "gl_SemanticsMakeVisible",
+                  fnCandidate.getName().c_str(), "");
+        }
+        if (storageClassSemantics2 & ~(storageClassSemantics)) {
+            error(loc, "semStorageUnequal must not include any option that is not present in semStorageEqual",
+                  fnCandidate.getName().c_str(), "");
+        }
+        if ((semantics ^ semantics2) & gl_SemanticsVolatile) {
+            error(loc, "semEqual and semUnequal must either both include gl_SemanticsVolatile or neither",
+                  fnCandidate.getName().c_str(), "");
+        }
     }
 }
 
@@ -3149,6 +3186,30 @@ void TParseContext::builtInOpCheck(const TSourceLoc& loc, const TFunction& fnCan
         if (!(*argp)[6]->getAsTyped()->getType().getQualifier().isConstant())
             error(loc, "argument must be compile-time constant", "matrixInterpretation", "");
         break;
+
+    case EOpCooperativeMatrixLoad:
+    case EOpCooperativeMatrixLoadNV:
+    case EOpCooperativeMatrixLoadTensorNV:
+    case EOpCooperativeMatrixStore:
+    case EOpCooperativeMatrixStoreNV:
+    case EOpCooperativeMatrixStoreTensorNV:
+    {
+        const TIntermTyped *arg1 = (*argp)[1]->getAsTyped();
+        const TIntermTyped* base = TIntermediate::traverseLValueBase(arg1, true, true);
+        const char* errMsg = "Only l-values corresponding to storage block or shared variables can be used with "
+                             "cooperative matrix load/store functions.";
+        if (base) {
+            const TType* refType = (base->getType().isReference()) ? base->getType().getReferentType() : nullptr;
+            const TQualifier& qualifier =
+                (refType != nullptr) ? refType->getQualifier() : base->getType().getQualifier();
+            if (qualifier.storage != EvqShared && qualifier.storage != EvqBuffer)
+                error(loc, errMsg, fnCandidate.getName().c_str(), "");
+        } else {
+            error(loc, errMsg, fnCandidate.getName().c_str(), "");
+        }
+    }
+    break;
+
     default:
         break;
     }
@@ -4574,11 +4635,6 @@ void TParseContext::globalQualifierTypeCheck(const TSourceLoc& loc, const TQuali
         error(loc, "can only be applied to a standalone 'out'", "blend equation", "");
 
     // now, knowing it is a shader in/out, do all the in/out semantic checks
-
-    if (publicType.basicType == EbtBool && !parsingBuiltins) {
-        error(loc, "cannot be bool", GetStorageQualifierString(qualifier.storage), "");
-        return;
-    }
 
     if (isTypeInt(publicType.basicType) || publicType.basicType == EbtDouble) {
         profileRequires(loc, EEsProfile, 300, nullptr, "non-float shader input/output");
@@ -7068,6 +7124,22 @@ void TParseContext::layoutObjectCheck(const TSourceLoc& loc, const TSymbol& symb
             break;
         }
     }
+
+    // Check that an in/out variable or block doesn't contain a boolean member
+    // Don't enforce if redeclaring a builtin, which are allowed to contain bool
+    if (!parsingBuiltins && type.containsBasicType(EbtBool) && !builtInName(symbol.getName())) {
+        switch(qualifier.storage) {
+        case EvqVaryingIn:
+        case EvqVaryingOut:
+        {
+            const char *reason = type.getBasicType() == EbtBool ? "cannot be bool" : "cannot contain bool";
+            error(loc, reason, GetStorageQualifierString(qualifier.storage), "");
+            break;
+        }
+        default:
+            break;
+        }
+    }
 }
 
 // "For some blocks declared as arrays, the location can only be applied at the block level:
@@ -7815,8 +7887,7 @@ const TFunction* TParseContext::findFunction400(const TSourceLoc& loc, const TFu
             TType toElementType(to, 0);
             // Load/store tensor functions allow any element type for the pointer
             if ((op == EOpCooperativeMatrixLoadTensorNV || op == EOpCooperativeMatrixStoreTensorNV) &&
-                param == 1 &&
-                (from.getQualifier().storage == EvqBuffer || from.getQualifier().storage == EvqShared)) {
+                param == 1) {
                 return true;
             }
             if (fromElementType == toElementType)
@@ -7929,8 +8000,7 @@ const TFunction* TParseContext::findFunctionExplicitTypes(const TSourceLoc& loc,
             TType toElementType(to, 0);
             // Load/store tensor functions allow any element type for the pointer
             if ((op == EOpCooperativeMatrixLoadTensorNV || op == EOpCooperativeMatrixStoreTensorNV) &&
-                param == 1 &&
-                (from.getQualifier().storage == EvqBuffer || from.getQualifier().storage == EvqShared)) {
+                param == 1) {
                 return true;
             }
             if (fromElementType == toElementType)
