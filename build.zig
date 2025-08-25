@@ -144,11 +144,13 @@ pub fn build(builder: *std.Build) !void {
 
     if (toolbox.getUpdate()) try update(&toolbox, &path);
 
-    const lib = builder.addStaticLibrary(.{
+    const lib = builder.addLibrary(.{
         .name = "glslang",
-        .root_source_file = builder.addWriteFiles().add("empty.c", ""),
-        .target = target,
-        .optimize = optimize,
+        .root_module = std.Build.Module.create(builder, .{
+            .root_source_file = builder.addWriteFiles().add("empty.zig", ""),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     const flags = [_][]const u8{
@@ -237,8 +239,10 @@ pub fn build(builder: *std.Build) !void {
     // the exe part is coming from https://github.com/Games-by-Mason/glslang-zig
     const exe = builder.addExecutable(.{
         .name = "glslangValidator",
-        .target = target,
-        .optimize = optimize,
+        .root_module = std.Build.Module.create(builder, .{
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     exe.linkLibCpp();
     exe.linkLibrary(lib);
