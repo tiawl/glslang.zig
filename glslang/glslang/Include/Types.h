@@ -517,6 +517,7 @@ public:
         spirvByReference = false;
         spirvLiteral = false;
         defaultBlock = false;
+        usedByAtomic = false;
     }
 
     // drop qualifiers that don't belong in a temporary variable
@@ -536,6 +537,7 @@ public:
         spirvDecorate = nullptr;
         spirvByReference = false;
         spirvLiteral = false;
+        usedByAtomic = false;
     }
 
     void clearInterstage()
@@ -617,6 +619,7 @@ public:
     bool nullInit : 1;
     bool spirvByReference : 1;
     bool spirvLiteral : 1;
+    bool usedByAtomic : 1; // EXT_descriptor_heap
     bool isWriteOnly() const { return writeonly; }
     bool isReadOnly() const { return readonly; }
     bool isRestrict() const { return restrict; }
@@ -660,6 +663,8 @@ public:
     bool isSpirvByReference() const { return spirvByReference; }
     void setSpirvLiteral() { spirvLiteral = true; }
     bool isSpirvLiteral() const { return spirvLiteral; }
+    void setUsedByAtomic() { usedByAtomic = true; }
+    bool isUsedByAtomic() const { return usedByAtomic; }
 
     bool isPipeInput() const
     {
@@ -875,6 +880,11 @@ public:
         clearInterstageLayout();
 
         layoutSpecConstantId = layoutSpecConstantIdEnd;
+        layoutBank = layoutBankEnd;
+        layoutDescriptorHeap = false;
+        layoutDescriptorStride = layoutDescriptorStrideEnd;
+        layoutHeapOffset = 0;
+        layoutDescriptorInnerBlock = false;
     }
     void clearInterstageLayout()
     {
@@ -916,6 +926,7 @@ public:
     TLayoutPacking layoutPacking : 4;
     int layoutOffset;
     int layoutAlign;
+    int layoutMemberOffset;
 
                  unsigned int layoutLocation             : 12;
     static const unsigned int layoutLocationEnd      =  0xFFF;
@@ -950,6 +961,12 @@ public:
                  unsigned int layoutSpecConstantId       : 11;
     static const unsigned int layoutSpecConstantIdEnd = 0x7FF;
 
+                 unsigned int layoutBank                 : 4;
+    static const unsigned int layoutBankEnd            = 0xF;
+
+                 unsigned int layoutDescriptorStride     : 4;
+    static const unsigned int layoutDescriptorStrideEnd = 0x0;
+
     // stored as log2 of the actual alignment value
                  unsigned int layoutBufferReferenceAlign :  6;
     static const unsigned int layoutBufferReferenceAlignEnd = 0x3F;
@@ -966,6 +983,9 @@ public:
     bool layoutQuadDeriv;
     bool layoutHitObjectShaderRecordNV;
     bool layoutHitObjectShaderRecordEXT;
+    bool layoutDescriptorHeap;
+    bool layoutDescriptorInnerBlock;
+    int layoutHeapOffset;
 
     // GL_EXT_spirv_intrinsics
     int spirvStorageClass;
@@ -991,6 +1011,7 @@ public:
         layoutPacking = ElpNone;
         layoutOffset = layoutNotSet;
         layoutAlign = layoutNotSet;
+        layoutMemberOffset = layoutNotSet;
 
         layoutSet = layoutSetEnd;
         layoutBinding = layoutBindingEnd;
@@ -1114,6 +1135,14 @@ public:
         // Not the same thing as being a specialization constant, this
         // is just whether or not it was declared with an ID.
         return layoutSpecConstantId != layoutSpecConstantIdEnd;
+    }
+    bool hasBank() const
+    {
+        return layoutBank != layoutBankEnd;
+    }
+    bool hasMemberOffset() const
+    {
+        return layoutMemberOffset != layoutNotSet;
     }
     bool isSpecConstant() const
     {
@@ -2007,6 +2036,22 @@ public:
         return contains([](const TType* t) { return t->isArray(); } );
     }
 
+    // Recursively check the structure for any arrays, needed for some error checks
+    virtual bool containsHeapArray() const
+    {
+        const auto containsResourceArray = [](const TType* t) {
+            return (t->isArray() &&
+                    (t->isImage() || t->isTexture() || t->getBasicType() == EbtSampler ||
+                     t->getBasicType() == EbtAccStruct ||
+                     t->getQualifier().storage == EvqUniform ||
+                     t->getQualifier().storage == EvqResourceHeap ||
+                     t->getQualifier().storage == EvqSamplerHeap ||
+                     t->getQualifier().storage == EvqBuffer));
+        };
+
+        return contains(containsResourceArray);
+    }
+
     // Check the structure for any structures, needed for some error checks
     virtual bool containsStructure() const
     {
@@ -2357,10 +2402,28 @@ public:
               if (qualifier.layoutHitObjectShaderRecordEXT)
                 appendStr(" hitobjectshaderrecordext");
 
+              if (qualifier.hasBank()) {
+                appendStr(" bank=");
+                appendUint(qualifier.layoutBank);
+              }
+              if (qualifier.hasMemberOffset()) {
+                appendStr(" member_offset=");
+                appendInt(qualifier.layoutMemberOffset);
+              }
+
               if (qualifier.layoutBindlessSampler)
                   appendStr(" layoutBindlessSampler");
               if (qualifier.layoutBindlessImage)
                   appendStr(" layoutBindlessImage");
+
+              if (qualifier.layoutDescriptorHeap)
+                  appendStr(" descriptor_heap");
+              if (qualifier.layoutDescriptorStride != TQualifier::layoutDescriptorStrideEnd) {
+                  appendStr(" descriptor_stride=");
+                  appendInt(qualifier.layoutDescriptorStride);
+              }
+              if (qualifier.layoutHeapOffset)
+                  appendStr(" heap_offset=");
 
               appendStr(")");
             }
