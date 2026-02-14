@@ -37,23 +37,11 @@ jobs:
         zig fetch --save "${URL}"
 
     - name: Test updating ${{ matrix.repo }}.zig
-      env:
-        REPO: "${{ matrix.repo }}"
-        RUNNER_TMP: "${{ runner.temp }}"
       shell: 'bash'
       run: |
         zig build -Dupdate -Dverbose
 
-    - name: Test fetching ${{ matrix.repo }}.zig
-      env:
-        REPO: "${{ matrix.repo }}"
-        RUNNER_TMP: "${{ runner.temp }}"
-        PR_BODY: "${{ github.event.pull_request.body }}"
+    - name: Test ${{ matrix.repo }}.zig example
       shell: 'bash'
       run: |
-        opts="$(printf '%s' "${PR_BODY}" | sed -n "s/^\[${REPO} fetch opts\] \(.*\)/\1/p")"
-        opts="${opts#"${opts%%[![:space:]]*}"}"
-        opts="${opts%"${opts##*[![:space:]]}"}"
-        set -f
-        zig build -Dfetch -Dverbose ${opts}
-        set +f
+        env -C ./example zig build
