@@ -41,7 +41,7 @@ fn buildFn(pkg_builder: *VerboseBuilder) !void {
 
     for ([_][]const u8{ "glslang", "SPIRV" }) |dir| {
         while (try pkg_builder.walk(&.{ "glslang", dir })) |*entry| {
-            if (toolbox.isCHeader(entry.basename)) pkg_builder.installHeader(lib, &.{ "glslang", dir, entry.path }, &.{entry.path});
+            if (toolbox.isCHeader(entry.basename)) pkg_builder.installHeader(lib, &.{ "glslang", dir, entry.path }, &.{ dir, entry.path });
         }
     }
 
