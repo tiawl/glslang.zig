@@ -56,3 +56,4 @@ jobs:
       shell: 'bash'
       run: |
         env -C ./example zig build
+        ./example/zig-out/bin/example
