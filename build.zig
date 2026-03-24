@@ -51,7 +51,7 @@ fn buildFn(pkg_builder: *VerboseBuilder) !void {
         switch (entry.kind) {
             .file => {
                 if (std.fs.path.dirname(entry.path)) |dirname| {
-                    var it = try std.fs.path.componentIterator(dirname);
+                    var it = std.fs.path.componentIterator(dirname);
                     if (std.mem.eql(u8, it.next().?.name, "glslang")) {
                         if (it.next()) |component| {
                             if (std.mem.eql(u8, component.name, "OSDependent")) continue;
