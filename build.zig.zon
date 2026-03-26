@@ -7,7 +7,7 @@
             .hash = "N-V-__8AAG-JngKTL8SyNPGjUkdu56u-G9y2KpLEnQP_nUhg",
         },
         .toolbox = .{
-            .url = "git+https://github.com/tiawl/toolbox.git#770f0a8af8adc0b309800ccaf382733b05f062b8",
+            .url = "git+https://github.com/tiawl/toolbox.git?ref=2.0.0-nightly#770f0a8af8adc0b309800ccaf382733b05f062b8",
             .hash = "toolbox-2.0.1-kRAu4DeDAABbwLXRRhOdGDx9cE_4_EEt4mLxqPWwUx0M",
             .branch = "zig-nightly",
         },
