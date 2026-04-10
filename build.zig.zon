@@ -3,8 +3,8 @@
     .version = "1.0.0",
     .dependencies = .{
         .glslang = .{
-            .url = "git+https://github.com/KhronosGroup/glslang#7d9fae2c95024cdf010006288bcacf5fea1fd6e9",
-            .hash = "N-V-__8AAFxYnwI7ut951bDQ2pLT9DVzGJBZ0MG68umV8E-a",
+            .url = "git+https://github.com/KhronosGroup/glslang#dcf1aaa6fd7dc2081f17aa0a4f1590a76473d961",
+            .hash = "N-V-__8AAA2LnwI5EvD-4nwtg_b7z3ZEei352KqW_xzqTorg",
         },
         .toolbox = .{
             .url = "git+https://github.com/tiawl/toolbox?ref=2.0.0#8cfe99b13c380c0a0437e9edc05ab4b961b242d6",
