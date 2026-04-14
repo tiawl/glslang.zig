@@ -7,12 +7,11 @@
             .hash = "N-V-__8AAA2LnwI5EvD-4nwtg_b7z3ZEei352KqW_xzqTorg",
         },
         .toolbox = .{
-            .url = "git+https://github.com/tiawl/toolbox?ref=2.0.1-nightly#77eed4c48c2d0590f618854a1ea2723db7564e50",
-            .hash = "toolbox-2.0.1-kRAu4DeDAAAuGdsJQqTDrGKN2CyNt9Xrxc8_qateuv50",
-            .branch = "zig-nightly",
+            .url = "git+https://github.com/tiawl/toolbox#d26b12bc2bf6bb0856a591d384cace3fd50445eb",
+            .hash = "toolbox-2.0.1-kRAu4DODAAC4GkZ714OgwurhfE5YXxI3BMQAlecmxa5f",
         },
     },
-    .minimum_zig_version = "0.16.0-dev",
+    .minimum_zig_version = "0.16.0",
     .fingerprint = 0xe15c80cea022542,
     .paths = .{
         "build.zig",
