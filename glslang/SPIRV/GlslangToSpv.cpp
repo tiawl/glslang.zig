@@ -3577,7 +3577,8 @@ bool TGlslangToSpvTraverser::visitAggregate(glslang::TVisit visit, glslang::TInt
             } else
                 constructed = builder.createOp(spv::Op::OpSampledImage, resultType(), arguments);
         } else if (node->getOp() == glslang::EOpConstructCooperativeMatrixKHR &&
-                   node->getType().isCoopMatKHR() && node->getSequence()[0]->getAsTyped()->getType().isCoopMatKHR()) {
+                   node->getType().isCoopMatKHR() && node->getSequence()[0]->getAsTyped()->getType().isCoopMatKHR() &&
+                   !node->getAsTyped()->getType().sameCoopMatUse(node->getSequence()[0]->getAsTyped()->getType())) {
             builder.addCapability(spv::Capability::CooperativeMatrixConversionsNV);
             builder.addExtension(spv::E_SPV_NV_cooperative_matrix2);
             constructed = builder.createCooperativeMatrixConversion(resultType(), arguments[0]);
@@ -3656,6 +3657,8 @@ bool TGlslangToSpvTraverser::visitAggregate(glslang::TVisit visit, glslang::TInt
         if (!glslangOperands[0]->getAsTyped()->getType().isLongVector() &&
             glslangOperands[0]->getAsTyped()->getVectorSize() == 1)
             binOp = glslang::EOpMul;
+        else if (isTypeFloat(node->getType().getBasicType()))
+            binOp = glslang::EOpDot;
         break;
     }
     case glslang::EOpMod:
@@ -8032,6 +8035,13 @@ spv::Id TGlslangToSpvTraverser::createBinaryOperation(glslang::TOperator op, OpD
     case glslang::EOpOuterProduct:
         binOp = spv::Op::OpOuterProduct;
         needMatchingVectors = false;
+        break;
+    case glslang::EOpDot:
+        if (typeProxy == glslang::EbtBFloat16) {
+            builder.addExtension(spv::E_SPV_KHR_bfloat16);
+            builder.addCapability(spv::Capability::BFloat16DotProductKHR);
+        }
+        binOp = spv::Op::OpDot;
         break;
 
     case glslang::EOpDiv:
