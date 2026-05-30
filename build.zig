@@ -95,7 +95,12 @@ fn buildFn(pkg_builder: *VerboseBuilder) !void {
 
     const glslang_run_cmd = pkg_builder.addRunArtifact(validator);
     pkg_builder.dependOn(&glslang_run_cmd.step, pkg_builder.getInstallStep());
-    pkg_builder.addArgs(glslang_run_cmd, pkg_builder.getArgs());
+    // TODO: remove this after 0.17.0 release
+    if (@hasField(std.Build, "args")) {
+        pkg_builder.addArgs(glslang_run_cmd, pkg_builder.getArgs());
+    } else if (@hasDecl(std.Build.Step.Run, "addPassthruArgs")) {
+        pkg_builder.addPassthruArgs(glslang_run_cmd);
+    } else unreachable;
     const glslang_run_step = pkg_builder.step("glslangValidator", "Run glslang");
     pkg_builder.dependOn(glslang_run_step, &glslang_run_cmd.step);
 
